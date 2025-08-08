@@ -1,4 +1,4 @@
-DECLARE @RelatedYear INT = 2025, @RelatedMonth INT = 6;
+DECLARE @RelatedYear INT = 2025, @RelatedMonth INT = 7;
 
 WITH Events_S1200 AS (
     SELECT e.Id EventId, e.RelatedYear, e.RelatedMonth, e.EntityCode, CONVERT(XML, c.Content) ContentXML
@@ -20,16 +20,17 @@ WITH Events_S1200 AS (
         RelatedYear,
         RelatedMonth,
         EntityCode,
-        t.n.value('(../../matricula)[1]', 'varchar(50)') AS Matricula,
-        t.n.value('(../../../nrInsc)[1]', 'varchar(14)') AS Estabelecimento,
-        t.n.value('(../codRubr)[1]', 'varchar(10)') AS CodigoRubrica,
-        t.n.value('(../vrRubr)[1]', 'decimal(15,2)') AS ValorRubrica,
-        t.n.value('(instFinanc)[1]', 'varchar(10)') AS InstituicaoFinanceira,
-        t.n.value('(nrDoc)[1]', 'varchar(50)') AS NumeroDocumento,
-        t.n.value('(cnpjDescFolha)[1]', 'varchar(14)') AS CNPJDescFolha,
-        t.n.value('(tpDesc)[1]', 'varchar(5)') AS TipoDesconto,
-        t.n.value('(observacao)[1]', 'varchar(255)') AS Observacao,
-        ROW_NUMBER() OVER (PARTITION BY EventId ORDER BY (SELECT NULL)) AS OrdemDescFolha
+        t.n.value('(/eSocial/evtRemun/ideTrabalhador/cpfTrab)[1]', 'varchar(11)') CPF,
+        t.n.value('(../../matricula)[1]', 'varchar(50)') Matricula,
+        t.n.value('(../../../nrInsc)[1]', 'varchar(14)') Estabelecimento,
+        t.n.value('(../codRubr)[1]', 'varchar(10)') CodigoRubrica,
+        t.n.value('(../vrRubr)[1]', 'decimal(15,2)') ValorRubrica,
+        t.n.value('(instFinanc)[1]', 'varchar(10)') InstituicaoFinanceira,
+        t.n.value('(nrDoc)[1]', 'varchar(50)') NumeroDocumento,
+        t.n.value('(cnpjDescFolha)[1]', 'varchar(14)') CNPJDescFolha,
+        t.n.value('(tpDesc)[1]', 'varchar(5)') TipoDesconto,
+        t.n.value('(observacao)[1]', 'varchar(255)') Observacao,
+        ROW_NUMBER() OVER (PARTITION BY EventId ORDER BY (SELECT NULL)) OrdemDescFolha
     FROM Events_XML
     CROSS APPLY ContentXML.nodes('/eSocial/evtRemun/dmDev/infoPerApur/ideEstabLot/remunPerApur/itensRemun[descFolha]/descFolha') AS t(n)
 )  
