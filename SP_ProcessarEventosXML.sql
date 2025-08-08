@@ -71,7 +71,7 @@ BEGIN
         
         WHILE @@FETCH_STATUS = 0
         BEGIN
-            DECLARE @InstFinancXML XML = '<instFinanc>' + @InstFinanc + '</instFinanc>', @ContratoXML XML = '<nrDoc>' + @NrContrato + '</nrDoc>';
+            DECLARE @InstFinancXML XML = '<instFinanc>' + RIGHT('00' + @InstFinanc, 3) + '</instFinanc>', @ContratoXML XML = '<nrDoc>' + @NrContrato + '</nrDoc>';
             
             SET @XML.modify('
                 delete /eSocial/evtRemun/dmDev/infoPerApur/ideEstabLot/remunPerApur[matricula=sql:variable("@Matricula")]/itensRemun[codRubr=sql:variable("@Rubrica")]/descFolha/instFinanc
@@ -96,7 +96,7 @@ BEGIN
         
         CLOSE descfolha_cursor;
         DEALLOCATE descfolha_cursor;
-        
+        SELECT @XML
         UPDATE XMLContent
         SET Content = CONVERT(NVARCHAR(MAX), @XML)
         WHERE ReferenceId = @EventId AND ContentReferenceEnum = 0;

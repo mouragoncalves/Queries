@@ -121,6 +121,6 @@ BEGIN TRANSACTION;
 
     -- Limpar tabelas temporárias
     DROP TABLE #Events_WithCredits;
-    DROP TABLE #EventsToUpdate;
+    DROP TABLE #EventsToUpdate;''
 
 ROLLBACK TRANSACTION;
