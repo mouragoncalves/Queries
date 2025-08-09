@@ -1,22 +1,24 @@
-DECLARE @RelatedYear INT = 2025, @RelatedMonth INT = 6;
+DECLARE @RelatedYear INT = 2025, @RelatedMonth INT = 7;
 
 WITH Events_S1200 AS (
-    SELECT e.Id EventId, e.RelatedYear, e.RelatedMonth, e.EntityCode, CONVERT(XML, c.Content) ContentXML
+    SELECT e.Id EventId, e.RelatedYear, e.RelatedMonth, e.EntityCode, CONVERT(XML, c.Content) ContentXML, e.EventStatusEnum
     FROM Event e 
     JOIN XMLContent c ON c.ReferenceId = e.Id
     WHERE e.EventTypeEnum = 8
         AND e.RelatedYear = @RelatedYear
         AND e.RelatedMonth = @RelatedMonth
-        AND e.EventStatusEnum <= 7
+        -- AND e.EventStatusEnum = 7
         AND c.ContentReferenceEnum = 0
+        AND e.EntityCode = '3811'
 ), Events_XML AS (
     SELECT * 
     FROM Events_S1200
-    WHERE ContentXML.exist('/eSocial/evtRemun/dmDev/infoPerApur/ideEstabLot/remunPerApur/itensRemun/descFolha') = 1
-        -- OR ContentXML.value('count(/eSocial/evtRemun/dmDev/infoPerApur/ideEstabLot/remunPerApur/itensRemun/descFolha)', 'int') > 0
+    WHERE --ContentXML.exist('/eSocial/evtRemun/dmDev/infoPerApur/ideEstabLot/remunPerApur/itensRemun/descFolha') = 1
+        ContentXML.value('count(/eSocial/evtRemun/dmDev/infoPerApur/ideEstabLot/remunPerApur/itensRemun/descFolha)', 'int') > 0
 )
 SELECT 
     EventId,
+    EventStatusEnum,
     RelatedYear,
     RelatedMonth,
     EntityCode,
@@ -32,5 +34,6 @@ SELECT
     t.n.value('(observacao)[1]', 'varchar(255)') AS Observacao,
     ROW_NUMBER() OVER (PARTITION BY EventId ORDER BY (SELECT NULL)) AS OrdemDescFolha
 FROM Events_XML
-CROSS APPLY ContentXML.nodes('/eSocial/evtRemun/dmDev/infoPerApur/ideEstabLot/remunPerApur/itensRemun[descFolha]/descFolha') AS t(n)
+CROSS APPLY ContentXML.nodes('/eSocial/evtRemun/dmDev/infoPerApur/ideEstabLot/remunPerApur/itensRemun/descFolha') AS t(n)
 
+-- SELECT * FROM Event WHERE EntityCode = '3811' AND RelatedYear = 2025 AND RelatedMonth = 7

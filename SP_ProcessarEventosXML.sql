@@ -23,7 +23,7 @@ BEGIN
         SELECT 
             *
         FROM Events_S1200
-        WHERE ContentXML.exist('/eSocial/evtRemun/dmDev/infoPerApur/ideEstabLot/remunPerApur/itensRemun/descFolha') = 1
+        WHERE ContentXML.value('count(/eSocial/evtRemun/dmDev/infoPerApur/ideEstabLot/remunPerApur/itensRemun/descFolha)', 'int') > 0
     )
     SELECT 
         EventId, RelatedYear, RelatedMonth, ContentXML 
@@ -73,30 +73,41 @@ BEGIN
         BEGIN
             DECLARE @InstFinancXML XML = '<instFinanc>' + RIGHT('00' + @InstFinanc, 3) + '</instFinanc>', @ContratoXML XML = '<nrDoc>' + @NrContrato + '</nrDoc>';
             
-            SET @XML.modify('
-                delete /eSocial/evtRemun/dmDev/infoPerApur/ideEstabLot/remunPerApur[matricula=sql:variable("@Matricula")]/itensRemun[codRubr=sql:variable("@Rubrica")]/descFolha/instFinanc
-            ');
-            
-            SET @XML.modify('
-                delete /eSocial/evtRemun/dmDev/infoPerApur/ideEstabLot/remunPerApur[matricula=sql:variable("@Matricula")]/itensRemun[codRubr=sql:variable("@Rubrica")]/descFolha/nrDoc
-            ');
+            IF (@XML.value('count(/eSocial/evtRemun/dmDev/infoPerApur/ideEstabLot/remunPerApur/itensRemun/descFolha)', 'int') = 1)
+            BEGIN
+                SET @XML.modify('delete //itensRemun[codRubr=sql:variable("@Rubrica")]/descFolha/instFinanc')
+                SET @XML.modify('delete //itensRemun[codRubr=sql:variable("@Rubrica")]/descFolha/nrDoc')
 
-            SET @XML.modify('
-                insert sql:variable("@InstFinancXML")
-                as last into (/eSocial/evtRemun/dmDev/infoPerApur/ideEstabLot/remunPerApur[matricula=sql:variable("@Matricula")]/itensRemun[codRubr=sql:variable("@Rubrica")]/descFolha)[1]
-            ');
-            
-            SET @XML.modify('
-                insert sql:variable("@ContratoXML")
-                as last into (/eSocial/evtRemun/dmDev/infoPerApur/ideEstabLot/remunPerApur[matricula=sql:variable("@Matricula")]/itensRemun[codRubr=sql:variable("@Rubrica")]/descFolha)[1]
-            ');
+                SET @XML.modify('insert sql:variable("@InstFinancXML") as last into (//itensRemun[codRubr=sql:variable("@Rubrica")]/descFolha)[1]')
+                SET @XML.modify('insert sql:variable("@ContratoXML") as last into (//itensRemun[codRubr=sql:variable("@Rubrica")]/descFolha)[1]')
+            END
+            ELSE
+            BEGIN
+                SET @XML.modify('
+                    delete /eSocial/evtRemun/dmDev/infoPerApur/ideEstabLot/remunPerApur[matricula=sql:variable("@Matricula")]/itensRemun[codRubr=sql:variable("@Rubrica")]/descFolha/instFinanc
+                ');
+                
+                SET @XML.modify('
+                    delete /eSocial/evtRemun/dmDev/infoPerApur/ideEstabLot/remunPerApur[matricula=sql:variable("@Matricula")]/itensRemun[codRubr=sql:variable("@Rubrica")]/descFolha/nrDoc
+                ');
+
+                SET @XML.modify('
+                    insert sql:variable("@InstFinancXML")
+                    as last into (/eSocial/evtRemun/dmDev/infoPerApur/ideEstabLot/remunPerApur[matricula=sql:variable("@Matricula")]/itensRemun[codRubr=sql:variable("@Rubrica")]/descFolha)[1]
+                ');
+                
+                SET @XML.modify('
+                    insert sql:variable("@ContratoXML")
+                    as last into (/eSocial/evtRemun/dmDev/infoPerApur/ideEstabLot/remunPerApur[matricula=sql:variable("@Matricula")]/itensRemun[codRubr=sql:variable("@Rubrica")]/descFolha)[1]
+                ');
+            END
 
             FETCH NEXT FROM descfolha_cursor INTO @InstFinanc, @NrContrato, @Matricula, @Rubrica;
         END
         
         CLOSE descfolha_cursor;
         DEALLOCATE descfolha_cursor;
-        SELECT @XML
+        
         UPDATE XMLContent
         SET Content = CONVERT(NVARCHAR(MAX), @XML)
         WHERE ReferenceId = @EventId AND ContentReferenceEnum = 0;
