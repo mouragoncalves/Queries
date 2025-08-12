@@ -14,7 +14,7 @@ WITH Events_S1200 AS (
         AND e.RelatedMonth = @RelatedMonth
         AND e.EventStatusEnum <= 7
         AND c.ContentReferenceEnum = 0
-        AND e.Id = 18338850
+        AND e.Id = 18410586
 ), Events_EConsignado AS (
     SELECT *--top 1 * 
     FROM Events_S1200
