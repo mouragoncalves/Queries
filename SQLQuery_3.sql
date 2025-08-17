@@ -4,7 +4,7 @@ SELECT
     *
 FROM WorkerCredit WHERE Matricula = 'UNA-SP-COL01022013R0149' OR Cpf = '776817540'
 EXEC sp_ProcessarEventosXML @EventIds = '18342378'
-SELECT * FROM XMLContent WHERE ReferenceId = 18346403
+SELECT * FROM XMLContent WHERE ReferenceId = 18476693
 SELECT * FROM Event WHERE Id = 18346901
 
 -- WHERE -- ([Year] = 2025 AND [Month] = 7) OR 

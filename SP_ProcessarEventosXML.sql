@@ -6,29 +6,28 @@ CREATE OR ALTER PROCEDURE [dbo].[sp_ProcessarEventosXML]
     @EventIds VARCHAR(MAX)
 AS
 BEGIN
-    -- DECLARE @Competencia VARCHAR(7), @EventIds VARCHAR(MAX) = '18455455'
-
     DROP TABLE IF EXISTS #EventsToUpdate;
     DROP TABLE IF EXISTS #Events_WithCredits;
 
-    WITH Events_S1200 AS (
+    WITH Events AS (
         SELECT 
             e.Id EventId, e.RelatedYear, e.RelatedMonth, e.EntityCode, CONVERT(XML, c.Content) ContentXML
         FROM Event e 
         JOIN XMLContent c ON c.ReferenceId = e.Id
-        WHERE e.Id IN (SELECT CAST(value AS INT) FROM STRING_SPLIT(@EventIds, ','))
-            -- AND e.EventStatusEnum = 0
+        WHERE e.EventTypeEnum = 8
+            AND e.Id IN (SELECT CAST(value AS INT) FROM STRING_SPLIT(@EventIds, ','))
+            AND e.EventStatusEnum = 0
             AND c.ContentReferenceEnum = 0
     ), Events_EConsignado AS (
         SELECT 
             *
-        FROM Events_S1200
+        FROM Events
         WHERE ContentXML.value('count(/eSocial/evtRemun/dmDev/infoPerApur/ideEstabLot/remunPerApur/itensRemun/descFolha)', 'int') > 0
     )
     SELECT 
         EventId, RelatedYear, RelatedMonth, ContentXML 
     INTO #EventsToUpdate
-    FROM Events_S1200
+    FROM Events;
 
     SELECT eu.EventId, wc.*
     INTO #Events_WithCredits
@@ -42,8 +41,8 @@ BEGIN
         FROM #EventsToUpdate
         CROSS APPLY ContentXML.nodes('/eSocial/evtRemun/dmDev/infoPerApur/ideEstabLot/remunPerApur/itensRemun[descFolha]/descFolha') AS t(n)
     ) eu
-    JOIN WorkerCredit wc ON wc.Matricula = eu.Matricula AND wc.Rubrica = eu.CodigoRubrica
-        AND wc.Competencia = RIGHT(CONCAT('0', eu.RelatedMonth, '/', eu.RelatedYear), 7)
+    JOIN WorkerCredit wc ON UPPER(wc.Matricula) = UPPER(eu.Matricula) AND wc.Rubrica = eu.CodigoRubrica
+        AND wc.Competencia = RIGHT(CONCAT('0', eu.RelatedMonth, '/', eu.RelatedYear), 7);
 
     DECLARE @EventId INT, @XML XML;
     DECLARE events_cursor CURSOR FOR
@@ -71,47 +70,63 @@ BEGIN
         
         WHILE @@FETCH_STATUS = 0
         BEGIN
-            -- SELECT @InstFinanc, @NrContrato, @Matricula, @Rubrica
-            DECLARE @InstFinancXML XML = '<instFinanc>' + RIGHT('00' + @InstFinanc, 3) + '</instFinanc>', @ContratoXML XML = '<nrDoc>' + @NrContrato + '</nrDoc>';
+            SET @InstFinanc = ISNULL(@InstFinanc, '');
+            SET @NrContrato = ISNULL(@NrContrato, '');
             
-            -- SELECT @XML.value('count(/eSocial/evtRemun/dmDev/infoPerApur/ideEstabLot/remunPerApur/itensRemun/descFolha)', 'int') Qtd
+            DECLARE @InstFinancXML XML = '<instFinanc>' + RIGHT('000' + @InstFinanc, 3) + '</instFinanc>';
+            DECLARE @ContratoXML XML = '<nrDoc>' + @NrContrato + '</nrDoc>';
             
-            IF (@XML.value('count(/eSocial/evtRemun/dmDev/infoPerApur/ideEstabLot/remunPerApur/itensRemun/descFolha)', 'int') = 1)
+            DECLARE @MatriculaUpper VARCHAR(50) = UPPER(@Matricula);
+            
+            DECLARE @MatriculaXML VARCHAR(50);
+            SELECT @MatriculaXML = t.n.value('.', 'varchar(50)')
+            FROM @XML.nodes('/eSocial/evtRemun/dmDev/infoPerApur/ideEstabLot/remunPerApur/matricula') AS t(n)
+            WHERE UPPER(t.n.value('.', 'varchar(50)')) = @MatriculaUpper;
+            
+            DECLARE @DescFolhaCount INT = 0;
+            IF @MatriculaXML IS NOT NULL
             BEGIN
-                SET @XML.modify('delete //itensRemun[codRubr=sql:variable("@Rubrica")]/descFolha/instFinanc')
-                SET @XML.modify('delete //itensRemun[codRubr=sql:variable("@Rubrica")]/descFolha/nrDoc')
-
-                SET @XML.modify('insert sql:variable("@InstFinancXML") as last into (//itensRemun[codRubr=sql:variable("@Rubrica")]/descFolha)[1]')
-                SET @XML.modify('insert sql:variable("@ContratoXML") as last into (//itensRemun[codRubr=sql:variable("@Rubrica")]/descFolha)[1]')
+                SET @DescFolhaCount = @XML.value(
+                    'count(/eSocial/evtRemun/dmDev/infoPerApur/ideEstabLot/remunPerApur[matricula=sql:variable("@MatriculaXML")]/itensRemun[codRubr=sql:variable("@Rubrica")]/descFolha)', 
+                    'int'
+                );
             END
-            ELSE
+            
+            IF @DescFolhaCount > 0 AND @MatriculaXML IS NOT NULL
             BEGIN
                 SET @XML.modify('
-                    replace value of (/eSocial/evtRemun/dmDev/infoPerApur/ideEstabLot/remunPerApur/matricula/text())[1] 
-                    with fn:upper-case((/eSocial/evtRemun/dmDev/infoPerApur/ideEstabLot/remunPerApur/matricula/text())[1])
-                ');
-
-                -- SELECT @Matricula, @Rubrica
-                
-                SET @XML.modify('
-                    delete /eSocial/evtRemun/dmDev/infoPerApur/ideEstabLot/remunPerApur[matricula=sql:variable("@Matricula")]/itensRemun[codRubr=sql:variable("@Rubrica")]/descFolha/instFinanc
+                    delete /eSocial/evtRemun/dmDev/infoPerApur/ideEstabLot/remunPerApur[matricula=sql:variable("@MatriculaXML")]/itensRemun[codRubr=sql:variable("@Rubrica")]/descFolha/instFinanc
                 ');
                 
                 SET @XML.modify('
-                    delete /eSocial/evtRemun/dmDev/infoPerApur/ideEstabLot/remunPerApur[matricula=sql:variable("@Matricula")]/itensRemun[codRubr=sql:variable("@Rubrica")]/descFolha/nrDoc
+                    delete /eSocial/evtRemun/dmDev/infoPerApur/ideEstabLot/remunPerApur[matricula=sql:variable("@MatriculaXML")]/itensRemun[codRubr=sql:variable("@Rubrica")]/descFolha/nrDoc
                 ');
 
                 SET @XML.modify('
                     insert sql:variable("@InstFinancXML")
-                    as last into (/eSocial/evtRemun/dmDev/infoPerApur/ideEstabLot/remunPerApur[matricula=sql:variable("@Matricula")]/itensRemun[codRubr=sql:variable("@Rubrica")]/descFolha)[1]
+                    as last into (/eSocial/evtRemun/dmDev/infoPerApur/ideEstabLot/remunPerApur[matricula=sql:variable("@MatriculaXML")]/itensRemun[codRubr=sql:variable("@Rubrica")]/descFolha)[1]
                 ');
                 
                 SET @XML.modify('
                     insert sql:variable("@ContratoXML")
-                    as last into (/eSocial/evtRemun/dmDev/infoPerApur/ideEstabLot/remunPerApur[matricula=sql:variable("@Matricula")]/itensRemun[codRubr=sql:variable("@Rubrica")]/descFolha)[1]
+                    as last into (/eSocial/evtRemun/dmDev/infoPerApur/ideEstabLot/remunPerApur[matricula=sql:variable("@MatriculaXML")]/itensRemun[codRubr=sql:variable("@Rubrica")]/descFolha)[1]
                 ');
-
-                -- SELECT @XML
+            END
+            ELSE
+            BEGIN
+                IF @MatriculaXML IS NOT NULL
+                BEGIN
+                    DECLARE @AvisoXML XML = '<observacao>AVISO: Dados do credito nao encontrados na WorkerCredit para Matricula: ' + @Matricula + ', Rubrica: ' + @Rubrica + '</observacao>';
+                    
+                    SET @XML.modify('
+                        delete /eSocial/evtRemun/dmDev/infoPerApur/ideEstabLot/remunPerApur[matricula=sql:variable("@MatriculaXML")]/itensRemun[codRubr=sql:variable("@Rubrica")]/descFolha/observacao
+                    ');
+                    
+                    SET @XML.modify('
+                        insert sql:variable("@AvisoXML")
+                        as last into (/eSocial/evtRemun/dmDev/infoPerApur/ideEstabLot/remunPerApur[matricula=sql:variable("@MatriculaXML")]/itensRemun[codRubr=sql:variable("@Rubrica")]/descFolha)[1]
+                    ');
+                END
             END
 
             FETCH NEXT FROM descfolha_cursor INTO @InstFinanc, @NrContrato, @Matricula, @Rubrica;
@@ -123,15 +138,13 @@ BEGIN
         UPDATE XMLContent
         SET Content = CONVERT(NVARCHAR(MAX), @XML)
         WHERE ReferenceId = @EventId AND ContentReferenceEnum = 0;
-
-        -- SELECT @xml
         
         FETCH NEXT FROM events_cursor INTO @EventId;
     END
 
     CLOSE events_cursor;
     DEALLOCATE events_cursor;
-    
+
     DROP TABLE #Events_WithCredits;
     DROP TABLE #EventsToUpdate;
 END
