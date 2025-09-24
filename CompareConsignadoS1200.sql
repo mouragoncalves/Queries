@@ -13,7 +13,6 @@ WITH WorkerCreditsData AS (
         INNER JOIN XMLContent c ON c.ReferenceId = e.Id AND c.ContentReferenceEnum = 0 AND CHARINDEX('<descFolha>', c.Content) > 0
     WHERE e.EventTypeEnum = 8
         AND e.EntityCode IN (SELECT CAST(value AS varchar) FROM STRING_SPLIT(@EntitiesCode, ','))
-        -- AND e.BusinessKey IN (SELECT DISTINCT Matricula FROM WorkerCreditsData)
         AND e.RelatedYear = @RelatedYear
         AND e.RelatedMonth = @RelatedMonth
         AND e.EventStatusEnum IN (0, 6, 7)
