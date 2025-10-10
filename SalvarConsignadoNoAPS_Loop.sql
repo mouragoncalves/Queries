@@ -1,24 +1,24 @@
---SELECT 
---    pk,
---	ee.matricula,
---    ao.id_allowance,
---    a.name,
---    a.code,
---    ao.id_object,
---    o.[object],
---    ao.id_type_payment,
---    tp.[object],
---	id_allowance_object,
---    ao.money_2
---FROM Allowance_Object ao
---    JOIN Allowance a ON a.id_allowance = ao.id_allowance
---    JOIN [Object] o ON o.id_object = ao.id_object
---    JOIN v_type_payment tp ON tp.id_type_payment = ao.id_type_payment
---	--JOIN v_employee e ON e.id_employee = ao.pk
---	JOIN Enrollment_Employee ee ON ee.id_enrollment = ao.pk
-----WHERE ao.datetime_1 > '2025-08-01'
---	  --WHERE a.code = '16965'
---	  WHERE ee.matricula = 'BASIE22062023R292224'
+SELECT 
+   pk,
+	ee.matricula,
+   ao.id_allowance,
+   a.name,
+   a.code,
+   ao.id_object,
+   o.[object],
+   ao.id_type_payment,
+   tp.[object],
+	id_allowance_object,
+   ao.money_2
+FROM Allowance_Object ao
+   JOIN Allowance a ON a.id_allowance = ao.id_allowance
+   JOIN [Object] o ON o.id_object = ao.id_object
+   JOIN v_type_payment tp ON tp.id_type_payment = ao.id_type_payment
+	--JOIN v_employee e ON e.id_employee = ao.pk
+	JOIN Enrollment_Employee ee ON ee.id_enrollment = ao.pk
+--WHERE ao.datetime_1 > '2025-08-01'
+	  --WHERE a.code = '16965'
+	  WHERE ee.matricula = 'BASIE22062023R292224'
  
 --SELECT * FROM Allowance_Object WHERE pk = 93562
  

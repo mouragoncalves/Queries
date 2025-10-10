@@ -42,7 +42,7 @@ CROSS JOIN (
 CROSS JOIN (
     SELECT id_type_payment 
     FROM v_type_payment 
-    WHERE object IN ('RECISAO', 'CONTRA_CHEQUE')
+    WHERE object IN ('RESCISAO', 'CONTRA_CHEQUE')
 ) tp
 LEFT JOIN Allowance_Object ao ON ao.pk = ee.id_enrollment 
     AND ao.id_allowance = a.id_allowance
@@ -52,23 +52,25 @@ LEFT JOIN Allowance_Object ao ON ao.pk = ee.id_enrollment
 BEGIN TRY
     BEGIN TRANSACTION
 
-    UPDATE ao
-    SET money_2 = db.Parcela
-    FROM Allowance_Object ao
-    INNER JOIN @DataBase db ON ao.id_allowance_object = db.existing_id_allowance_object
-    WHERE db.existing_id_allowance_object IS NOT NULL
-    AND db.existing_money_2 != db.Parcela;
+    -- UPDATE ao
+    -- SET money_2 = db.Parcela
+    -- FROM Allowance_Object ao
+    -- INNER JOIN @DataBase db ON ao.id_allowance_object = db.existing_id_allowance_object
+    -- WHERE db.existing_id_allowance_object IS NOT NULL
+    -- AND db.existing_money_2 != db.Parcela;
 
-    INSERT INTO Allowance_Object (pk, id_allowance, id_object, id_type_payment, char_1, money_2)
-    SELECT 
-        db.id_enrollment,
-        db.id_allowance,
-        db.id_object,
-        db.id_type_payment,
-        'ABM',
-        db.Parcela
-    FROM @DataBase db
-    WHERE db.existing_id_allowance_object IS NULL;
+    -- INSERT INTO Allowance_Object (pk, id_allowance, id_object, id_type_payment, char_1, money_2)
+    -- SELECT 
+    --     db.id_enrollment,
+    --     db.id_allowance,
+    --     db.id_object,
+    --     db.id_type_payment,
+    --     'ABM',
+    --     db.Parcela
+    -- FROM @DataBase db
+    -- WHERE db.existing_id_allowance_object IS NULL;
+
+    SELECT * FROM @DataBase
 
     COMMIT TRANSACTION
 END TRY

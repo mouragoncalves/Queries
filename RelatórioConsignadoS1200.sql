@@ -51,7 +51,7 @@ WITH
         e.CPF, e.Matricula,
         
         -- Dados para comparação
-        w.IfConcessoraCodigo C_Financeira, w.Contrato C_Contrato, w.ValorParcela C_Parcela,
+        w.IfConcessoraCodigo A_Financeira, w.Contrato A_Contrato, w.ValorParcela A_Parcela,
         e.InstituicaoFinanceira E_Financeira, e.NumeroContrato E_Contrato, e.ValorRubrica E_Parcela,
         
         -- Validações individuais
