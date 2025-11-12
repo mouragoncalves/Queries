@@ -18,7 +18,7 @@ FROM Allowance_Object ao
 	JOIN Enrollment_Employee ee ON ee.id_enrollment = ao.pk
 --WHERE ao.datetime_1 > '2025-08-01'
 	  --WHERE a.code = '16965'
-	  WHERE ee.matricula = 'BASIE22062023R292224'
+	  WHERE ee.matricula = 'USB09031998R0002'
  
 --SELECT * FROM Allowance_Object WHERE pk = 93562
  
@@ -31,8 +31,7 @@ DECLARE @eConsignado TABLE (
  
 INSERT INTO @eConsignado VALUES 
 	('USB09031998R0002', '16965', 100.2),
-	('USB09031998R0002', '16966', 527.75),
-	('USB09031998R0003', '16965', 15.37);
+	('USB09031998R0002', '16966', 527.75);
  
 DECLARE c_consignado CURSOR FOR
 SELECT Matricula, Rubrica, Parcela FROM @eConsignado
@@ -75,21 +74,24 @@ BEGIN
 		AND id_object = @id_object
 		AND id_type_payment = @id_type_payment
  
-	IF(@ex = 1)
-		BEGIN 
-			IF(@dif <> 1)
-			BEGIN
-				UPDATE Allowance_Object SET money_2 = @parcela
-				WHERE id_allowance_object = @id_allowance_object
-			END
-		END
-	ELSE
-		BEGIN
+    DELETE ao
+    FROM Allowance_Object ao
+    JOIN Allowance a ON a.id_allowance = ao.id_allowance
+    WHERE a.code IN ('16965','16966','16967','16968','16969','16975','16976','16977','16978')
+	-- IF(@ex = 1)
+	-- 	BEGIN 
+	-- 		IF(@dif <> 1)
+	-- 		BEGIN
+	-- 			UPDATE Allowance_Object SET money_2 = @parcela
+	-- 			WHERE id_allowance_object = @id_allowance_object
+	-- 		END
+	-- 	END
+	-- ELSE
+	-- 	BEGIN
 			INSERT INTO Allowance_Object (pk, id_allowance, id_object, id_type_payment, char_1, money_2)
 			VALUES (@id_enrollment, @id_allowance, @id_object, @id_type_payment, 'ABM', @parcela);
-		END
+		-- END
  
-	
 	FETCH NEXT FROM c_consignado INTO @matricula, @rubrica, @parcela
 END
 CLOSE c_consignado

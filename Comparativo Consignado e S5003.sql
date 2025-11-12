@@ -8,7 +8,7 @@ WITH WorkerCreditsData AS (
         wc.MainEntityCode, wc.[Year], wc.[Month], wc.Competencia, wc.NumeroInscricaoEstabelecimento CNPJ, wc.matricula, wc.NomeTrabalhador, 
         RIGHT('00000000000' + wc.Cpf, 11) CPF, wc.Contrato, FORMAT(wc.IfConcessoraCodigo, '000') Financeira, wc.ValorParcela, wc.Rubrica
     FROM WorkerCredit wc
-    WHERE wc.Month <= 8 --AND wc.matricula = 'APS-EDUC06022024R115120'
+    WHERE wc.Month = 9 --AND wc.matricula = 'APS-EDUC06022024R115120'
 ), WorkerCreditsDistinct AS (
     SELECT DISTINCT matricula FROM WorkerCreditsData
 ), EventXmlsDataS2299 AS (
@@ -19,7 +19,7 @@ WITH WorkerCreditsData AS (
     WHERE e.EventTypeEnum = 25
         AND e.EventStatusEnum = 6
         AND e.RelatedYear = 2025
-        AND e.RelatedMonth < 9
+        AND e.RelatedMonth = 9
 ), EventsData AS (
     SELECT e.Id EventId, e.RelatedYear, e.RelatedMonth, e.EntityCode, e.BusinessKey, CONVERT(XML, c.Content) ContentXML
     FROM Event e
@@ -28,7 +28,7 @@ WITH WorkerCreditsData AS (
     WHERE e.EventTypeEnum = 47
         AND e.EventStatusEnum = 6
         AND e.RelatedYear = 2025
-        AND e.RelatedMonth < 9
+        AND e.RelatedMonth = 9
 ), EventXmlsDataS5003 AS (
     SELECT
         EventId,
@@ -54,7 +54,7 @@ select * FROM (SELECT
     IIF(e.CPF IS NULL, w.Cpf, E.CPF) EmployeeDocument, 
     IIF(e.Matricula IS NULL, w.Matricula, E.Matricula) BusinessKey, 
     w.Rubrica,
-    w.Financeira C_Financeira, w.Contrato C_Contrato, w.ValorParcela C_Parcela,
+    w.Financeira A_Financeira, w.Contrato A_Contrato, w.ValorParcela A_Parcela,
     e.Financeira E_Financeira, e.Contrato E_Contrato, e.ValorRubrica E_Parcela,
     -- CASE 
     --     WHEN w.Financeira = e.Financeira THEN 'OK'
@@ -71,15 +71,15 @@ select * FROM (SELECT
     CASE 
         WHEN w.Financeira = e.Financeira AND w.Contrato = e.Contrato THEN 'OK' 
         ELSE IIF(e.EventId IS NULL, 'Sem informação do APS', 'Divergente ABM')
-    END Validacao--,
-    -- CASE 
-    --     WHEN ABS(w.ValorParcela - e.ValorRubrica) <= 0.01 THEN 'OK'
-    --     WHEN w.ValorParcela IS NULL THEN 'Consignado sem valor'
-    --     WHEN e.ValorRubrica IS NULL THEN 'eSocial sem valor'
-    --     WHEN w.ValorParcela > e.ValorRubrica THEN 'Valor maior no consignado'
-    --     WHEN w.ValorParcela < e.ValorRubrica THEN 'Valor maior no eSocial'
-    --     ELSE 'DIVERGENTE'
-    -- END ValidaParcela_Status,
+    END Validacao,
+    CASE 
+        WHEN ABS(w.ValorParcela - e.ValorRubrica) <= 0.01 THEN 'OK'
+        WHEN w.ValorParcela IS NULL THEN 'Consignado sem valor'
+        WHEN e.ValorRubrica IS NULL THEN 'eSocial sem valor'
+        WHEN w.ValorParcela > e.ValorRubrica THEN 'Valor maior no consignado'
+        WHEN w.ValorParcela < e.ValorRubrica THEN 'Valor maior no eSocial'
+        ELSE 'DIVERGENTE'
+    END ValidaParcela_Status
     -- (e.ValorRubrica - w.ValorParcela) DiferencaValor,
     -- e.Observacao
 FROM EventXmlsDataS5003 e

@@ -28,7 +28,7 @@ WITH DadosBase AS (
         TotalParcelas,
         QtdRegistrosCPF
     FROM DadosBase
-    WHERE RN_Contrato = 1  -- Pega apenas um registro por contrato
+    WHERE RN_Contrato = 1
 ), EmprestimosPorCPF AS (
     SELECT 
         MainEntityCode,
@@ -71,16 +71,13 @@ SELECT
     MainEntityCode as Entidade_Matriz,
     Competencia as Mes_Ano,
     
-    -- Quantidades de empregados por número de empréstimos (formatados)
     FORMAT(Empregados_1_Emprestimo, 'N0', 'pt-BR') as Empregados_1_Emprestimo,
     FORMAT(Empregados_2_Emprestimos, 'N0', 'pt-BR') as Empregados_2_Emprestimos,
     FORMAT(Empregados_3_ou_Mais_Emprestimos, 'N0', 'pt-BR') as Empregados_3_ou_Mais_Emprestimos,
     FORMAT(Total_Empregados, 'N0', 'pt-BR') as Total_Empregados,
     
-    -- Total de empréstimos (formatado)
     FORMAT(Total_Emprestimos, 'N0', 'pt-BR') as Total_Emprestimos,
     
-    -- Valores monetários formatados (sem R$)
     FORMAT(Valor_Total_Emprestimos, 'N2', 'pt-BR') as Valor_Total_Emprestimos,
     FORMAT(MinTotalEmprestimosLiberado, 'N2', 'pt-BR') MinTotalEmprestimosLiberado,
     FORMAT(MaxTotalEmprestimosLiberado, 'N2', 'pt-BR') MaxTotalEmprestimosLiberado,
@@ -88,7 +85,6 @@ SELECT
     FORMAT(MinValorParcela, 'N2', 'pt-BR') MinValorParcela,
     FORMAT(MaxValorParcela, 'N2', 'pt-BR') MaxValorParcela,
     
-    -- 7. Média da quantidade de parcelas por empréstimo (formatado)
     FORMAT(
         CASE 
             WHEN Total_Emprestimos > 0 THEN 
@@ -97,7 +93,6 @@ SELECT
         END, 'N2', 'pt-BR'
     ) as Media_Parcelas_Por_Emprestimo,
     
-    -- 8. Média do valor da parcela por empregado (formatado sem R$)
     FORMAT(
         CASE 
             WHEN Total_Empregados > 0 THEN 
@@ -108,7 +103,6 @@ SELECT
 
 FROM ResumoConsolidado
 
--- Ordenação: Entidade, ano e depois por mês
 ORDER BY MainEntityCode, Competencia;
 
 -- Query adicional para visualizar a evolução consolidada (totais gerais por mês)

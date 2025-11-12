@@ -1,18 +1,18 @@
-DECLARE @MainEntityCode VARCHAR(20) = '101122', @EntitiesCode VARCHAR(MAX) = '101122,101223,101225,101226,102122,103122,104122,105122,106122,107122,112122,113122', @RelatedYear INT = 2025, @RelatedMonth INT = 7;
+DECLARE @MainEntityCode VARCHAR(20) = '101122', @RelatedYear INT = 2025, @RelatedMonth INT = 7;
 
 WITH WorkerCreditsData AS (
     SELECT
-        MainEntityCode, NomeTrabalhador, RIGHT('00000000000' + Cpf, 11) Cpf, Matricula, FORMAT(IfConcessoraCodigo, '000') Financeira, Contrato, ValorParcela, [Year], [Month]
+        MainEntityCode, NomeTrabalhador, RIGHT('00000000000' + Cpf, 11) Cpf, Matricula, FORMAT(IfConcessoraCodigo, '000') Financeira, Contrato, ValorParcela, [Year], [Month], Competencia
     FROM WorkerCredit 
     WHERE MainEntityCode = @MainEntityCode 
         AND [Year] = @RelatedYear 
         AND [Month] = @RelatedMonth
-), EventsData AS (
+), S1200 AS (
     SELECT e.Id EventId, e.RelatedYear, e.RelatedMonth, e.EntityCode, e.BusinessKey, CONVERT(XML, c.Content) ContentXML
     FROM Event e
         INNER JOIN XMLContent c ON c.ReferenceId = e.Id AND c.ContentReferenceEnum = 0 AND CHARINDEX('<descFolha>', c.Content) > 0
     WHERE e.EventTypeEnum = 8
-        AND e.EntityCode IN (SELECT CAST(value AS varchar) FROM STRING_SPLIT(@EntitiesCode, ','))
+        --AND e.EntityCode IN (SELECT CAST(value AS varchar) FROM STRING_SPLIT(@EntitiesCode, ','))
         AND e.RelatedYear = @RelatedYear
         AND e.RelatedMonth = @RelatedMonth
         AND e.EventStatusEnum IN (0, 6, 7)
@@ -30,8 +30,42 @@ WITH WorkerCreditsData AS (
         t.n.value('(instFinanc)[1]', 'varchar(10)') Financeira,
         t.n.value('(nrDoc)[1]', 'varchar(50)') Contrato,
         t.n.value('(observacao)[1]', 'varchar(255)') Observacao
-    FROM EventsData
+    FROM S1200
     CROSS APPLY ContentXML.nodes('/eSocial/evtRemun/dmDev/infoPerApur/ideEstabLot/remunPerApur/itensRemun[descFolha]/descFolha') AS t(n)
+), S2299 AS (
+    SELECT e.Id EventId, e.RelatedYear, e.RelatedMonth, e.EntityCode, e.BusinessKey
+    FROM Event e
+        INNER JOIN WorkerCreditsDistinct wc ON
+        e.BusinessKey = wc.Matricula
+    WHERE e.EventTypeEnum = 25
+        AND e.EventStatusEnum = 6
+        AND e.RelatedYear = 2025
+        AND e.RelatedMonth = 9
+), S5003 AS (
+    SELECT e.Id EventId, e.RelatedYear, e.RelatedMonth, e.EntityCode, e.BusinessKey, CONVERT(XML, c.Content) ContentXML
+    FROM Event e
+        INNER JOIN WorkerCreditsDistinct wc ON e.BusinessKey = wc.Matricula
+        INNER JOIN XMLContent c ON c.ReferenceId = e.Id AND c.ContentReferenceEnum = 0 --AND CHARINDEX('<eConsignado>', c.Content) > 0
+    WHERE e.EventTypeEnum = 47
+        AND e.EventStatusEnum = 6
+        AND e.RelatedYear = 2025
+        AND e.RelatedMonth = 9
+), XmlsDataS5003 AS (
+    SELECT
+        EventId,
+        RelatedYear,
+        RelatedMonth,
+        EntityCode,
+        t.n.value('(../../../../../*[local-name()="ideTrabalhador"]/*[local-name()="cpfTrab"])[1]', 'varchar(11)') AS CPF,
+        t.n.value('(../*[local-name()="matricula"])[1]', 'varchar(50)') AS Matricula,
+        t.n.value('(../../../*[local-name()="nrInsc"])[1]', 'varchar(14)') AS Estabelecimento,
+        '' AS Rubrica,
+        t.n.value('(*[local-name()="vreConsignado"])[1]', 'decimal(15,2)') AS ValorRubrica,
+        t.n.value('(*[local-name()="instFinanc"])[1]', 'varchar(10)') AS Financeira,
+        t.n.value('(*[local-name()="nrContrato"])[1]', 'varchar(50)') AS Contrato,
+        '' AS Observacao
+    FROM S5003
+    CROSS APPLY ContentXML.nodes('/*[local-name()="eSocial"]/*[local-name()="evtBasesFGTS"]/*[local-name()="infoFGTS"]/*[local-name()="ideEstab"]/*[local-name()="ideLotacao"]/*[local-name()="infoTrabFGTS"]/*[local-name()="eConsignado"]') AS t(n)
 )
 SELECT 
     e.EventId, w.MainEntityCode, e.EntityCode, 
