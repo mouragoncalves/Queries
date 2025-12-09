@@ -9,7 +9,7 @@ CREATE OR ALTER proc [dbo].[sp_GetCompareConsignadoS5003]
 AS
 BEGIN
 
-    -- DECLARE @MainEntityCode VARCHAR(20), @EntityCode VARCHAR(20), @Year INT = 2025, @Month INT = 9;
+    -- DECLARE @MainEntityCode VARCHAR(20), @EntityCode VARCHAR(20), @Year INT = 2025, @Month INT = 10;
 
     -- SET @MainEntityCode = '5111';
     -- SET @EntityCode = '5692';
@@ -51,7 +51,19 @@ BEGIN
         FROM Event e
         WHERE e.EventTypeEnum = 25
             AND e.EventStatusEnum = 6
-            AND e.BusinessKey IN (SELECT DISTINCT BusinessKey FROM WorkerCreditByEntityCode)
+            AND e.EntityCode IN (SELECT DISTINCT EntityCode FROM WorkerCreditByEntityCode)
+            -- AND e.BusinessKey IN (SELECT DISTINCT BusinessKey FROM WorkerCreditByEntityCode)
+    ), S2299X AS (
+        SELECT 
+            e.Id EventId, e.RelatedYear, e.RelatedMonth, e.EntityCode, e.BusinessKey, CONVERT(XML, c.Content) ContentXML
+        FROM Event e
+        INNER JOIN XMLContent c ON c.ReferenceId = e.Id AND c.ContentReferenceEnum = 0 AND (CHARINDEX('<descFolha>', c.Content) > 0 OR CHARINDEX('<sucessaoVinc>', c.Content) > 0)
+        WHERE e.EventTypeEnum = 25
+            AND e.RelatedYear = @Year
+            AND e.RelatedMonth = @Month
+            AND e.EventStatusEnum = 6
+            AND e.EntityCode IN (SELECT DISTINCT EntityCode FROM WorkerCreditByEntityCode)
+            -- AND e.BusinessKey IN (SELECT DISTINCT BusinessKey FROM WorkerCreditByEntityCode)
     ), S5003 AS (
         SELECT 
             e.Id EventId, e.RelatedYear, e.RelatedMonth, e.EntityCode, e.BusinessKey, CONVERT(XML, c.Content) ContentXML, 
@@ -62,7 +74,8 @@ BEGIN
             AND e.RelatedYear = @Year
             AND e.RelatedMonth = @Month
             AND e.EventStatusEnum = 6 
-            AND e.BusinessKey IN (SELECT DISTINCT BusinessKey FROM WorkerCreditByEntityCode)
+            AND e.EntityCode IN (SELECT DISTINCT EntityCode FROM WorkerCreditByEntityCode)
+            -- AND e.BusinessKey IN (SELECT DISTINCT BusinessKey FROM WorkerCreditByEntityCode)
     ), EventXmlsDataS5003 AS (
         SELECT
             EventId,
@@ -80,6 +93,23 @@ BEGIN
         FROM S5003
         CROSS APPLY ContentXML.nodes('/*[local-name()="eSocial"]/*[local-name()="evtBasesFGTS"]/*[local-name()="infoFGTS"]/*[local-name()="ideEstab"]/*[local-name()="ideLotacao"]/*[local-name()="infoTrabFGTS"]/*[local-name()="eConsignado"]') AS t(n)
         WHERE [Number] = 1
+    ), EventXmlsDataS2299 AS (
+        SELECT
+            EventId,
+            RelatedYear,
+            RelatedMonth,
+            EntityCode,
+            t.n.value('(../../../../../../ideVinculo/cpfTrab)[1]', 'varchar(11)') AS Cpf,
+            t.n.value('(../../../../../../ideVinculo/matricula)[1]', 'varchar(50)') AS BusinessKey,
+            t.n.value('(../nrInsc)[1]', 'varchar(14)') AS CnpjCno,
+            t.n.value('(codRubr)[1]', 'varchar(10)') AS Rubrica,
+            t.n.value('(vrRubr)[1]', 'decimal(15,2)') AS ValorParcela,
+            t.n.value('(descFolha/instFinanc)[1]', 'varchar(10)') AS Financeira,
+            t.n.value('(descFolha/nrDoc)[1]', 'varchar(50)') AS Contrato,
+            '' Observacao
+        FROM S2299X
+        CROSS APPLY ContentXML.nodes('/eSocial/evtDeslig/infoDeslig/verbasResc/dmDev/infoPerApur/ideEstabLot/detVerbas') AS t(n)
+        WHERE t.n.value('(codRubr)[1]', 'varchar(10)') IN ('16965', '16966', '16967', '16968', '16969', '16975', '16976', '16977', '16978')
     ), WorkerCreditByEntityCodeS2299 AS (
         SELECT 
             w.WorkerCreditId, w.MainEntityCode, W.EntityCode, w.CnpjCno, w.RelatedYear, w.RelatedMonth, w.Competencia, w.BusinessKey, w.Cpf, w.NomeTrabalhador, w.Rubrica, w.Financeira, w.Contrato, w.ValorParcela, 
@@ -90,6 +120,10 @@ BEGIN
             END Desligamento 
         FROM WorkerCreditByEntityCode w
         LEFT JOIN S2299 s ON s.BusinessKey = w.BusinessKey
+    ), EventsData AS (
+        SELECT * FROM EventXmlsDataS5003
+        UNION ALL 
+        SELECT * FROM EventXmlsDataS2299
     )
 
     SELECT 
@@ -104,6 +138,9 @@ BEGIN
         e.Financeira E_Financeira, e.Contrato E_Contrato, e.ValorParcela E_Parcela,
         (e.ValorParcela - w.ValorParcela) DiferencaValor,
         CASE 
+            WHEN EXISTS (
+                    SELECT 1 FROM S2299X sx WHERE sx.BusinessKey = w.BusinessKey AND sx.ContentXML.exist('//sucessaoVinc')  > 0
+                ) THEN 'Inativo – Transferência'
             WHEN e.EventId IS NULL THEN
                 CASE 
                     WHEN LEN(w.[Desligamento]) > 0 THEN w.Desligamento
@@ -119,52 +156,9 @@ BEGIN
                 AND w.Contrato = e.Contrato 
                 AND w.ValorParcela < e.ValorParcela THEN 'Erro no valor parcela'
             ELSE 
-            -- CASE
-            --     WHEN (w.Financeira IS NULL OR w.Contrato IS NULL OR w.ValorParcela IS NULL) THEN
-            --         'Consignado sem (' + 
-            --         STUFF((
-            --             SELECT ', ' + campo
-            --             FROM (
-            --                 SELECT 'financeira' AS campo WHERE w.Financeira IS NULL
-            --                 UNION ALL
-            --                 SELECT 'contrato' WHERE w.Contrato IS NULL
-            --                 UNION ALL
-            --                 SELECT 'valor' WHERE w.ValorParcela IS NULL
-            --             ) t
-            --             FOR XML PATH('')
-            --         ), 1, 2, '') + ')'
-                
-            --     WHEN (e.Financeira IS NULL OR e.Contrato IS NULL OR e.ValorParcela IS NULL) THEN
-            --         'eSocial sem (' + 
-            --         STUFF((
-            --             SELECT ', ' + campo
-            --             FROM (
-            --                 SELECT 'financeira' AS campo WHERE e.Financeira IS NULL
-            --                 UNION ALL
-            --                 SELECT 'contrato' WHERE e.Contrato IS NULL
-            --                 UNION ALL
-            --                 SELECT 'valor' WHERE e.ValorParcela IS NULL
-            --             ) t
-            --             FOR XML PATH('')
-            --         ), 1, 2, '') + ')'
-                
-            --     ELSE
-            'Dados Divergente'
-            -- 'Divergente (' + 
-            -- STUFF((
-            --     SELECT ', ' + campo
-            --     FROM (
-            --         SELECT 'financeira' AS campo WHERE w.Financeira != e.Financeira
-            --         UNION ALL
-            --         SELECT 'contrato' WHERE w.Contrato != e.Contrato
-            --         UNION ALL
-            --         SELECT 'valor' WHERE ABS(w.ValorParcela - e.ValorParcela) > 0.01
-            --     ) t
-            --     FOR XML PATH('')
-            -- ), 1, 2, '') + ')'
-            -- END
+                'Dados Divergente'
         END AS [Status]
-    FROM EventXmlsDataS5003 e
+    FROM EventsData e
     FULL OUTER JOIN WorkerCreditByEntityCodeS2299 w ON w.BusinessKey = e.BusinessKey AND w.Contrato = e.Contrato
     ORDER BY EmployeeDocument
 

@@ -1,7 +1,7 @@
 DECLARE @MainEntityCode VARCHAR(20), @EntityCode VARCHAR(20), @Year INT = 2025, @Month INT = 9;
 
-SET @MainEntityCode = '5111';
-SET @EntityCode = '5692';
+-- SET @MainEntityCode = '5111';
+SET @EntityCode = '5125';
 
 WITH WorkerCreditData AS (
     SELECT
@@ -40,7 +40,19 @@ WITH WorkerCreditData AS (
     FROM Event e
     WHERE e.EventTypeEnum = 25
         AND e.EventStatusEnum = 6
-        AND e.BusinessKey IN (SELECT DISTINCT BusinessKey FROM WorkerCreditByEntityCode)
+        AND e.EntityCode IN (SELECT DISTINCT EntityCode FROM WorkerCreditByEntityCode)
+        -- AND e.BusinessKey IN (SELECT DISTINCT BusinessKey FROM WorkerCreditByEntityCode)
+), S2299X AS (
+    SELECT 
+        e.Id EventId, e.RelatedYear, e.RelatedMonth, e.EntityCode, e.BusinessKey, CONVERT(XML, c.Content) ContentXML
+    FROM Event e
+    INNER JOIN XMLContent c ON c.ReferenceId = e.Id AND c.ContentReferenceEnum = 0 AND CHARINDEX('<descFolha>', c.Content) > 0
+    WHERE e.EventTypeEnum = 25
+        AND e.RelatedYear = @Year
+        AND e.RelatedMonth = @Month
+        AND e.EventStatusEnum = 6
+        AND e.EntityCode IN (SELECT DISTINCT EntityCode FROM WorkerCreditByEntityCode)
+        -- AND e.BusinessKey IN (SELECT DISTINCT BusinessKey FROM WorkerCreditByEntityCode)
 ), S5003 AS (
     SELECT 
         e.Id EventId, e.RelatedYear, e.RelatedMonth, e.EntityCode, e.BusinessKey, CONVERT(XML, c.Content) ContentXML, 
@@ -51,7 +63,8 @@ WITH WorkerCreditData AS (
         AND e.RelatedYear = @Year
         AND e.RelatedMonth = @Month
         AND e.EventStatusEnum = 6 
-        AND e.BusinessKey IN (SELECT DISTINCT BusinessKey FROM WorkerCreditByEntityCode)
+        AND e.EntityCode IN (SELECT DISTINCT EntityCode FROM WorkerCreditByEntityCode)
+        -- AND e.BusinessKey IN (SELECT DISTINCT BusinessKey FROM WorkerCreditByEntityCode)
 ), EventXmlsDataS5003 AS (
     SELECT
         EventId,
@@ -69,6 +82,23 @@ WITH WorkerCreditData AS (
     FROM S5003
     CROSS APPLY ContentXML.nodes('/*[local-name()="eSocial"]/*[local-name()="evtBasesFGTS"]/*[local-name()="infoFGTS"]/*[local-name()="ideEstab"]/*[local-name()="ideLotacao"]/*[local-name()="infoTrabFGTS"]/*[local-name()="eConsignado"]') AS t(n)
     WHERE [Number] = 1
+), EventXmlsDataS2299 AS (
+    SELECT
+        EventId,
+        RelatedYear,
+        RelatedMonth,
+        EntityCode,
+        t.n.value('(../../../../../../ideVinculo/cpfTrab)[1]', 'varchar(11)') AS Cpf,
+        t.n.value('(../../../../../../ideVinculo/matricula)[1]', 'varchar(50)') AS BusinessKey,
+        t.n.value('(../nrInsc)[1]', 'varchar(14)') AS CnpjCno,
+        t.n.value('(codRubr)[1]', 'varchar(10)') AS Rubrica,
+        t.n.value('(vrRubr)[1]', 'decimal(15,2)') AS ValorParcela,
+        t.n.value('(descFolha/instFinanc)[1]', 'varchar(10)') AS Financeira,
+        t.n.value('(descFolha/nrDoc)[1]', 'varchar(50)') AS Contrato,
+        '' Observacao
+    FROM S2299X
+    CROSS APPLY ContentXML.nodes('/eSocial/evtDeslig/infoDeslig/verbasResc/dmDev/infoPerApur/ideEstabLot/detVerbas') AS t(n)
+    WHERE t.n.value('(codRubr)[1]', 'varchar(10)') IN ('16965', '16966', '16967', '16968', '16969', '16975', '16976', '16977', '16978')
 ), WorkerCreditByEntityCodeS2299 AS (
     SELECT 
         w.WorkerCreditId, w.MainEntityCode, W.EntityCode, w.CnpjCno, w.RelatedYear, w.RelatedMonth, w.Competencia, w.BusinessKey, w.Cpf, w.NomeTrabalhador, w.Rubrica, w.Financeira, w.Contrato, w.ValorParcela, 
@@ -79,7 +109,11 @@ WITH WorkerCreditData AS (
         END Desligamento 
     FROM WorkerCreditByEntityCode w
     LEFT JOIN S2299 s ON s.BusinessKey = w.BusinessKey
-) --SELECT * FROM WorkerCreditByEntityCode
+), EventsData AS (
+    SELECT * FROM EventXmlsDataS5003
+    UNION ALL 
+    SELECT * FROM EventXmlsDataS2299
+)
 
 SELECT 
     e.EventId, w.MainEntityCode, w.EntityCode, 
@@ -153,6 +187,6 @@ SELECT
             -- ), 1, 2, '') + ')'
             -- END
     END AS [Status]
-FROM EventXmlsDataS5003 e
+FROM EventsData e
 FULL OUTER JOIN WorkerCreditByEntityCodeS2299 w ON w.BusinessKey = e.BusinessKey AND w.Contrato = e.Contrato
 ORDER BY EmployeeDocument
